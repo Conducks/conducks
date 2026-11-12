@@ -115,6 +115,45 @@ describe('UNUSED_MEMBER', () => {
     expect(subject(undefined, {}, { kind: 'interface' })).toEqual([]);
   });
 
+  describe('private fields', () => {
+    const withField = (field: Record<string, unknown>, typeDecorators: string[] = [], used = false) => {
+      const b = graph();
+      const app = `${F}/App.java`, svc = `${F}/Service.java`;
+      b.unit(app); b.unit(svc);
+      b.type(app, 'App'); b.method(app, 'App', 'main');
+      b.type(svc, 'Service'); b.method(svc, 'Service', 'run');
+      (b.g.getNode(`${svc}::service`) as any).properties.dna.decorators = typeDecorators;
+      b.g.addNode({ id: `${svc}::service.count`, label: 'ATOM', properties: {
+        name: field.name ?? 'count', filePath: svc, canonicalKind: 'ATOM', kind: 'field', unitId: `${svc}::unit`, parentId: `${svc}::service`,
+        dna: { visibility: 'visibility' in field ? field.visibility : 'private', decorators: field.decorators ?? [] } } } as never);
+      b.edge('CONSTRUCTS', `${app}::app.main`, `${svc}::service`);
+      b.edge('CALLS', `${app}::app.main`, `${svc}::service.run`);
+      if (used) b.edge('ACCESSES', `${svc}::service.run`, `${svc}::service.count`);
+      return new DeadCodeAnalyzer().analyze(b.g).filter(f => f.type === 'UNUSED_MEMBER').map(f => f.symbol);
+    };
+
+    it('reports a private field nothing reads or writes', () => {
+      expect(withField({})).toEqual(['Service.count']);
+    });
+    it('a field read or written anywhere in its file is used', () => {
+      expect(withField({}, [], true)).toEqual([]);
+    });
+    it('only PRIVATE fields are judged — any other may be used from another file', () => {
+      expect(withField({ visibility: null })).toEqual([]);
+      expect(withField({ visibility: 'public' })).toEqual([]);
+    });
+    it('an annotated field is spared, except by the compiler\'s own annotations', () => {
+      expect(withField({ decorators: ['@Autowired'] })).toEqual([]);
+      expect(withField({ decorators: ['@Deprecated'] })).toEqual(['Service.count']);
+    });
+    it('every field of an annotated class is spared (JPA, Lombok, serializers reach fields by reflection)', () => {
+      expect(withField({}, ['@Entity'])).toEqual([]);
+    });
+    it('serialVersionUID is read by the JVM', () => {
+      expect(withField({ name: 'serialVersionUID' })).toEqual([]);
+    });
+  });
+
   it('is judged for Java only — other languages wait for an oracle that scores members', () => {
     const b = graph();
     const app = '/r/app.ts', svc = '/r/service.ts';

@@ -30,7 +30,7 @@ public class JavaRefs {
       "java.lang.Deprecated", "java.lang.FunctionalInterface", "java.lang.SafeVarargs");
   static final class Def {
     String file, name, kind, owner; int line; long start, end;
-    boolean test, annotated, main, accessor, isPublic, enumConstant, topLevel, api;
+    boolean test, annotated, main, accessor, isPublic, isPrivate, enumConstant, topLevel, api;
     String override;      // "abstract:<owner>.<name>" (compile-required) | "concrete:<…>" | "unresolved"
     int refs, refsOtherFile, refsNonTest, importRefs, memberRefs; String firstMemberRef; String firstRef;
   }
@@ -80,6 +80,7 @@ public class JavaRefs {
               .anyMatch(n -> !COMPILER_ANNOTATIONS.contains(n));
           d.enumConstant = e.getKind() == ElementKind.ENUM_CONSTANT;
           d.isPublic = e.getModifiers().contains(Modifier.PUBLIC);
+          d.isPrivate = e.getModifiers().contains(Modifier.PRIVATE);
           d.topLevel = e.getEnclosingElement() != null && e.getEnclosingElement().getKind() == ElementKind.PACKAGE;
           // API: reachable from outside the project — public/protected all the way up to the package.
           d.api = true;
@@ -182,7 +183,7 @@ public class JavaRefs {
       sb.append('{').append("\"file\":").append(q(d.file)).append(",\"line\":").append(d.line)
         .append(",\"name\":").append(q(d.name)).append(",\"kind\":").append(q(d.kind)).append(",\"owner\":").append(q(d.owner))
         .append(",\"test\":").append(d.test).append(",\"annotated\":").append(d.annotated).append(",\"main\":").append(d.main)
-        .append(",\"accessor\":").append(d.accessor).append(",\"enumConstant\":").append(d.enumConstant).append(",\"isPublic\":").append(d.isPublic).append(",\"topLevel\":").append(d.topLevel).append(",\"api\":").append(d.api)
+        .append(",\"accessor\":").append(d.accessor).append(",\"enumConstant\":").append(d.enumConstant).append(",\"isPublic\":").append(d.isPublic).append(",\"topLevel\":").append(d.topLevel).append(",\"isPrivate\":").append(d.isPrivate).append(",\"api\":").append(d.api)
         .append(",\"override\":").append(q(d.override)).append(",\"refs\":").append(d.refs)
         .append(",\"importRefs\":").append(d.importRefs).append(",\"memberRefs\":").append(d.memberRefs).append(",\"firstMemberRef\":").append(q(d.firstMemberRef)).append(",\"refsOtherFile\":").append(d.refsOtherFile).append(",\"refsNonTest\":").append(d.refsNonTest)
         .append(",\"firstRef\":").append(q(d.firstRef)).append('}');

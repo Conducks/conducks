@@ -173,13 +173,19 @@ const silentMethods = unreferencedMembers.filter(d => d.kind === 'method' && liv
 // A public/protected method of a public type is API: code outside the project may call it, so no
 // caller inside is not death. Listed, not charged — prune deliberately does not judge it.
 const apiSilent = silentMethods.filter(d => d.api);
+// PRIVATE FIELDS of a live, unannotated type that javac sees no reference to — what prune's field rule
+// claims it reports (dead-code.ts). An annotated class's fields are reached by reflection (JPA, Lombok).
+const annotatedType = new Set(scored.filter(d => d.kind === 'class' && d.annotated).map(d => `${d.file}::${d.name}`));
+const missedFields = unreferencedMembers.filter(d => d.kind === 'field' && d.isPrivate && d.name !== 'serialVersionUID'
+  && liveType.has(`${d.file}::${d.owner}`) && !annotatedType.has(`${d.file}::${d.owner}`)
+  && !spoke.has(`${d.file.toLowerCase()}::${d.name.toLowerCase()}`));
 const missedMembers = silentMethods.filter(d => !d.api);
 
 const label = (d) => (d.owner ? `${d.owner}.` : '') + d.name;
 console.log(`\n--- Java dead code vs javac (${path.basename(projectDir)}) ---`);
 console.log(`  files attributed                 : ${o.files}  (javac errors without a dependency classpath: ${o.errors}${o.errors ? ` — first: ${o.firstError.slice(0, 90)}` : ''})`);
 console.log(`  declarations walked              : ${scored.length}  (+${o.defs.length - scored.length} in test sources, not scored); top-level types scored: ${scored.filter(topLevel).length}`);
-console.log(`  members nothing references       : ${unreferencedMembers.length}  (outside prune's scope — a class member is not judged in any language; not charged)`);
+console.log(`  members nothing references       : ${unreferencedMembers.length}  (all kinds, before the exemptions below; listed, not charged)`);
 console.log(`  compiler: no reference at all    : ${unreferenced.length}  — of which framework-annotated: ${framework.length} (not charged as MISSED)`);
 console.log(`  conducks verdicts on .java files : ${findings.length - unimported}  (+${unimported} UNIMPORTED_MODULE questions, not scored; ${unimportedLive} of them on compiler-referenced symbols)`);
 console.log(`  agreed (verdict, compiler sees no reference): ${agreed.length}`);
@@ -190,6 +196,8 @@ console.log(`  public API methods no project code calls: ${apiSilent.length}  (r
 console.log(`  MISSED METHODS (non-API, of a live type, compiler sees no reference, conducks silent): ${missedMembers.length}`);
 for (const m of missedMembers.slice(0, 20)) console.log(`      ${label(m)}  ${m.file}:${m.line}`);
 if (missedMembers.length > 20) console.log(`      … ${missedMembers.length - 20} more`);
+console.log(`  MISSED PRIVATE FIELDS (of a live, unannotated type; compiler sees no reference; conducks silent): ${missedFields.length}`);
+for (const m of missedFields.slice(0, 20)) console.log(`      ${label(m)}  ${m.file}:${m.line}`);
 console.log(`  EXTRA (conducks says dead, compiler finds a reference): ${extra.length}`);
 for (const e of extra) console.log(`      ${e.f.type} ${e.f.symbol}  ${e.where}\n          ← ${e.why}`);
 if (ambiguous.length) {
@@ -214,13 +222,14 @@ const prev = baseline[key];
 let failed = false;
 if (extra.length > 0) { console.error(`\n✖ ${extra.length} finding(s) javac contradicts.`); failed = true; }
 if (prev && missed.length > prev.missed) { console.error(`\n✖ RECALL WENT BACKWARDS: ${prev.missed} missed before, ${missed.length} now.`); failed = true; }
+if (prev && prev.missedFields !== undefined && missedFields.length > prev.missedFields) { console.error(`\n✖ FIELD RECALL WENT BACKWARDS: ${prev.missedFields} missed before, ${missedFields.length} now.`); failed = true; }
 if (prev && prev.missedMethods !== undefined && missedMembers.length > prev.missedMethods) { console.error(`\n✖ METHOD RECALL WENT BACKWARDS: ${prev.missedMethods} missed before, ${missedMembers.length} now.`); failed = true; }
 if (failed && process.argv.includes('--write-baseline')) {
   console.error(`\n  ⚠ recording a baseline over a FAILING ratchet, because --write-baseline was passed.`);
 } else if (failed) process.exit(1);
 
 if (process.argv.includes('--write-baseline')) {
-  baseline[key] = { defs: scored.length, dead: findings.length - unimported, missed: missed.length, missedMethods: missedMembers.length, extra: extra.length };
+  baseline[key] = { defs: scored.length, dead: findings.length - unimported, missed: missed.length, missedMethods: missedMembers.length, missedFields: missedFields.length, extra: extra.length };
   writeFileSync(BASELINE, JSON.stringify(baseline, null, 2) + '\n');
   console.log(`\n  baseline recorded for ${key}.\n`);
   process.exit(0);

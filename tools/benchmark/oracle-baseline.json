@@ -200,10 +200,11 @@
     "extra": 0
   },
   "fixture::java-dead": {
-    "defs": 82,
-    "dead": 6,
+    "defs": 94,
+    "dead": 10,
     "missed": 0,
     "missedMethods": 0,
+    "missedFields": 0,
     "extra": 0
   },
   "spring-petclinic::java-dead": {
@@ -211,6 +212,7 @@
     "dead": 0,
     "missed": 0,
     "missedMethods": 0,
+    "missedFields": 0,
     "extra": 0
   },
   "gson::java-dead": {
@@ -218,11 +220,12 @@
     "dead": 1,
     "missed": 1,
     "missedMethods": 0,
+    "missedFields": 0,
     "extra": 0
   },
   "fixture::java-calls": {
-    "pairs": 36,
-    "exact": 33,
+    "pairs": 41,
+    "exact": 38,
     "recallWrong": 2,
     "precisionWrong": 1
   },

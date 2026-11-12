@@ -1544,6 +1544,10 @@ export class SynapsePersistence {
       WHERE (n.canonicalKind = 'DATA'
          OR (n.canonicalKind = 'ATOM'
              AND COALESCE(n.dna->>'$.isExported', 'false') <> 'true'
+             -- A FIELD is a member of its class, not a local: kept so dead-code can judge it (only
+             -- Java emits kind 'field'). Without this a private field nothing reads had no edge and
+             -- was dropped here, so an unused field could never be reported (2026-11-12).
+             AND COALESCE(n.semantic_kind, '') <> 'field'
              AND NOT EXISTS (
                SELECT 1 FROM edges e
                WHERE (e.sourceId = n.id OR e.targetId = n.id)

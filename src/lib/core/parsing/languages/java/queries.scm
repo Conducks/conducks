@@ -159,6 +159,10 @@
   (method_invocation !object name: (identifier) @kinesis_target)
   (method_invocation object: [(method_invocation) (object_creation_expression) (field_access object: [(identifier) (field_access) (method_invocation) (super)]) (super) (this) (parenthesized_expression) (array_access) (string_literal) (cast_expression) (class_literal) (scoped_identifier)] name: (identifier) @kinesis_target)
 
+  ;; Every identifier USED in the file: the reflector keeps those that name a field of this file and
+  ;; turns them into ACCESSES edges (a field is read as `x` or `this.x`, never called).
+  (identifier) @field_use
+
   ;; A declared variable's TYPE — local or field — read the way `const x = new Y()` is in TypeScript:
   ;; the type is written on the declaration. `var` states nothing and is skipped.
   (local_variable_declaration type: (type_identifier) @instance_type (#not-eq? @instance_type "var") declarator: (variable_declarator name: (identifier) @instance_name)) @isInstanceOf

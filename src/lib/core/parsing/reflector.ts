@@ -154,6 +154,13 @@ function visibilityOf(declNode: any): 'public' | 'protected' | 'private' | null 
   return null;
 }
 
+/** The node that carries a declaration's modifiers: the field declaration around a Java declarator. */
+function declarationHost(declNode: any): any {
+  let n = declNode;
+  if (n?.type === 'identifier' && n.parent?.type === 'variable_declarator') n = n.parent;   // a field's NAME
+  return n?.type === 'variable_declarator' && n.parent?.type === 'field_declaration' ? n.parent : declNode;
+}
+
 function decoratorsOf(declNode: any): string[] {
   if (!declNode) return [];
   const found: string[] = [];
@@ -583,6 +590,8 @@ export class ConducksReflector {
     const pendingIface = new PendingPair();
 
     const refValueCandidates: Array<{ scope: string; name: string; raw: string; line: number }> = [];
+    // Identifiers USED (not declared) in this file, for `@field_use` (Java) — see the emission below.
+    const fieldUses: Array<{ scope: string; name: string; line: number }> = [];
     // Namespace member READS (`analytics.trackPageView` used as a value, not called). Collected
     // rather than emitted inline for the same reason refValueCandidates are: an import statement is
     // not guaranteed to have been reflected before the member that uses it, so the binding may not
@@ -683,8 +692,10 @@ export class ConducksReflector {
               isStatic: match.captures.some((c: any) => c.name === CaptureTags.IS_STATIC),
               params: paramsOf(match),
               // What the source hands this symbol to before anything calls it (ADR: decorators.ts).
-              decorators: decoratorsOf(rangeNode),
-              visibility: visibilityOf(rangeNode),
+              // A Java FIELD's name sits in a `variable_declarator`; its annotations and access keyword
+              // sit on the enclosing `field_declaration` (`@Autowired private Repo repo;`).
+              decorators: decoratorsOf(declarationHost(rangeNode)),
+              visibility: visibilityOf(declarationHost(rangeNode)),
               // Written inside an object literal / call argument — a member, not a module symbol.
               nestedInExpression: isNestedInExpression(rangeNode),
               // Inside `impl Trait for X` (Rust): reached through the trait, never judged on its own.
@@ -1140,6 +1151,19 @@ export class ConducksReflector {
             refValueCandidates.push({ scope: (scope || 'unit').toLowerCase(), name: a.toLowerCase(), raw: a, line: currentMatchRow + 1 });
           }
         }
+        else if (cName === 'field_use') {
+          // Every identifier the file USES. Its own declaration is not a use, and a call's method name
+          // names a method; everything else may read or write a field.
+          const n = capture.node;
+          const parent = n.parent;
+          const declares = parent && parent.childForFieldName?.('name')?.startIndex === n.startIndex
+            && parent.type !== 'field_access' && parent.type !== 'method_invocation';
+          const calls = parent?.type === 'method_invocation' && parent.childForFieldName?.('name')?.startIndex === n.startIndex;
+          if (!declares && !calls) {
+            const scope = getScopeAt(currentMatchRow, undefined, undefined, currentMatchCol);
+            fieldUses.push({ scope: (scope || 'unit').toLowerCase(), name: cText, line: currentMatchRow + 1 });
+          }
+        }
         else if (cName === 'instance_call_name') {
           // `const db = CoreDatabaseManager.getInstance()` — remember WHICH CALL produced the value.
           //
@@ -1496,6 +1520,34 @@ export class ConducksReflector {
         confidence: 0.8,
         metadata: { referenceAsValue: true, original: raw, line }
       });
+    }
+
+    // FIELD READS AND WRITES (Java). A field is read as a bare name or `this.x`, neither of which is a
+    // call, so no edge reached a field and every one was pruned as unreferenced — dead fields could
+    // not be reported at all. Each use of a name that is a FIELD of this file becomes an ACCESSES edge
+    // from the using scope. By name within the file, not by scope: a local of the same name shadows
+    // it, so this over-reports use, never under-reports it — and a PRIVATE field (the only kind
+    // dead-code judges) can be used nowhere but this file.
+    if (fieldUses.length) {
+      const fieldsByName = new Map<string, string[]>();
+      for (const [key, n] of nodeCache) {
+        if (String((n as any).kind ?? '') !== 'field') continue;
+        const list = fieldsByName.get(String((n as any).name)) ?? [];
+        list.push(key);
+        fieldsByName.set(String((n as any).name), list);
+      }
+      const seenUse = new Set<string>();
+      for (const { scope, name, line } of fieldUses) {
+        for (const target of fieldsByName.get(name) ?? []) {
+          const k = `${scope}|${target}`;
+          if (seenUse.has(k) || target.endsWith(`::${scope}`)) continue;
+          seenUse.add(k);
+          spectrum.relationships.push({
+            sourceName: scope, targetName: target, type: 'ACCESSES' as any, confidence: 0.8,
+            metadata: { fieldUse: true, original: name, line },
+          });
+        }
+      }
     }
 
     // Attach `instanceOf` to the variable nodes the walk produced (todo29#P3b).

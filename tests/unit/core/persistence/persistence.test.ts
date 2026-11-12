@@ -342,6 +342,22 @@ describe('SynapsePersistence', () => {
         { id: 'e-d-x', sourceId: 'src/a.ts::p', targetId: 'src/a.ts::target-x' },
       ]);
     });
+
+    // A FIELD with no edge is exactly what dead-code must see: a private field nothing reads. Dropped
+    // here, it could never be reported (2026-11-12). A plain variable with no edge is still dropped.
+    it('keeps a field with no reference edge, and still drops an edgeless variable', async () => {
+      await persistence.saveNodes(
+        [
+          { id: 'src/a.java::owner', label: 'class', properties: { name: 'Owner', filePath: 'src/a.java', canonicalKind: 'STRUCTURE' } },
+          { id: 'src/a.java::owner.stale', label: 'field', properties: { name: 'stale', kind: 'field', filePath: 'src/a.java', canonicalKind: 'ATOM', parentId: 'src/a.java::owner' } },
+          { id: 'src/a.java::owner.m.tmp', label: 'variable', properties: { name: 'tmp', kind: 'variable', filePath: 'src/a.java', canonicalKind: 'ATOM', parentId: 'src/a.java::owner' } },
+        ],
+        'pulse1'
+      );
+      await persistence.pruneTaxonomy();
+      const ids = (await persistence.query<{ id: string }>('SELECT id FROM nodes ORDER BY id')).map(n => n.id);
+      expect(ids).toEqual(['src/a.java::owner', 'src/a.java::owner.stale']);
+    });
   });
 
   // ---------------------------------------------------------------------------------------------

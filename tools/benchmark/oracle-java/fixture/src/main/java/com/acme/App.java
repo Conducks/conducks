@@ -34,6 +34,9 @@ public class App {
         Object[] cells = new Cell[2];             // array creation only
         try { s.area(); } catch (Boom e) { }      // catch only
         String flow = new Workflow().run();
+        Settings settings = new Settings("x");
+        settings.hit();
+        flow = flow + settings.describe();
         System.out.println(flow + read + pair + marked + tag + cells.length);
         System.out.println(owner.getName() + p.x() + c + a + sq + up + t + b.template());
     }

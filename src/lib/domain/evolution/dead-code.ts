@@ -553,6 +553,32 @@ export class DeadCodeAnalyzer {
     for (const node of nodes) {
       const props = node.properties as any;
       const file = String(props?.filePath ?? '');
+      // A PRIVATE FIELD nothing reads or writes. Java's own rule makes this decidable from one file: a
+      // private field can be used nowhere else, and the parser records every use of its name there
+      // (reflector `@field_use`). Spared: an annotated field (@Autowired, @Column, @SerializedName —
+      // a framework sets or reads it), any field of an annotated class (@Entity, @Data: JPA, Lombok
+      // and serializers reach fields by reflection), and serialVersionUID, which the JVM reads.
+      if (node.label === 'ATOM' && String(props?.kind ?? '') === 'field' && props?.name && judged(file.toLowerCase())) {
+        if (DeadCodeAnalyzer.isTestPath(file)) continue;
+        if (String(props.dna?.visibility ?? '') !== 'private') continue;
+        // The compiler's own annotations hand the field to nobody (`@Deprecated`, `@SuppressWarnings`).
+        const hooks = ((props.dna?.decorators ?? []) as string[]).filter(d => !/^@(java\.lang\.)?(Deprecated|SuppressWarnings)\b/.test(d));
+        if (hooks.length > 0) continue;
+        if (props.name === 'serialVersionUID') continue;
+        const holder = graph.getNode(String(props.parentId ?? '')) as any;
+        if (!holder || holder.label !== 'STRUCTURE' || !typeInUse(String(holder.id))) continue;
+        if (((holder.properties?.dna?.decorators ?? []) as string[]).length > 0) continue;
+        const used = graph.getNeighbors(node.id, 'upstream')
+          .some((e: any) => DeadCodeAnalyzer.REFERENCE_EDGES.has(e.type) && e.sourceId !== node.id);
+        if (used) continue;
+        out.push({
+          type: 'UNUSED_MEMBER',
+          symbol: `${holder.properties.name}.${props.name}`,
+          file,
+          message: `Private field is never read or written. Only reflection could use it (a serializer, an injector) — check for one before deleting.`,
+        });
+        continue;
+      }
       if (node.label !== 'BEHAVIOR' || !props?.name || !judged(file.toLowerCase())) continue;
       if (DeadCodeAnalyzer.isTestPath(file) || isNested(node)) continue;
       const owner = graph.getNode(String(props.parentId ?? '')) as any;

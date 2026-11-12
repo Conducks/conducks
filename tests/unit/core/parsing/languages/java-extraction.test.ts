@@ -152,6 +152,15 @@ enum Mode {
     expect(typed.some((t) => t.startsWith('helloservice.prefix:') && t.includes('string'))).toBe(true);
   });
 
+  // A field is read as a bare name or `this.x` — never called — so no edge reached a field and every one
+  // was pruned: dead fields could not be reported (2026-11-12). The fixture's `prefix` and `counter`
+  // are written in the constructor and read in `greet` / `bump`.
+  it('records a read or write of a field as ACCESSES from the using method', () => {
+    const uses = result.rels.filter((r) => r.type === 'ACCESSES').map((r) => `${r.source}->${String(r.target).split('::').pop()}`);
+    expect(uses).toContain('helloservice.greet->helloservice.prefix');
+    expect(uses).toContain('helloservice.bump->helloservice.counter');
+  });
+
   it('records the import specifiers', () => {
     const imports = result.rels.filter((r) => r.type === 'IMPORTS').map((r) => r.specifier);
     expect(imports).toContain('java.util.List');
