@@ -25,12 +25,11 @@ export interface ConducksComponent {
 }
 
 /**
- * Metadata for a registry entry, tracked for auditing and status.
+ * Metadata for a registry entry, tracked for auditing.
  */
 export interface RegistryEntry<T extends ConducksComponent> {
   component: T;
   registeredAt: Date;
-  status: 'active' | 'deprecated' | 'error';
 }
 
 /**

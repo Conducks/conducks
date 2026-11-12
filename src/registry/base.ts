@@ -27,7 +27,6 @@ export class ConducksRegistry<T extends ConducksComponent> {
     this.components.set(component.id, {
       component,
       registeredAt: new Date(),
-      status: 'active'
     });
 
     process.stderr.write(`[Conducks Registry] Registered: ${component.id} (type: ${component.type}, version: ${component.version})\n`);
@@ -48,15 +47,9 @@ export class ConducksRegistry<T extends ConducksComponent> {
     return Array.from(this.components.values()).map(entry => entry.component);
   }
 
-  /**
-   * Marks a component as deprecated without removing it.
-   */
-  public deprecate(id: string): void {
-    const entry = this.components.get(id);
-    if (entry) {
-      entry.status = 'deprecated';
-    }
-  }
+  // (`deprecate(id)` lived here. Nothing called it and nothing read the status it set — `get` and
+  // `getAll` return a component whatever its status — so it named a feature that did not exist.
+  // Removed with the status field: state-machine audit P-01-9, P-09-12.)
 
   /**
    * Removes a component from the registry.
