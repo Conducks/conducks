@@ -55,6 +55,12 @@ export class AnalysisService {
 
     // Safeguard against indexing the root of the filesystem
     if (targetRoot === '/' || targetRoot === '\\') {
+      // Re-resolving to the working directory only helps when that is somewhere else. From `/` it
+      // recursed with the same root until the stack overflowed (state-machine audit P-06-8).
+      if (path.resolve(process.cwd()) === targetRoot) {
+        logger.warn(`Analysis root is the filesystem root (/). Nothing was analyzed — run it from, or pass, a project directory.`);
+        return { success: false, files: 0 };
+      }
       logger.warn(`Analysis root resolved to system root (/). Re-resolving to process.cwd()`);
       return this.analyze({ ...options, root: process.cwd() });
     }
@@ -79,8 +85,6 @@ export class AnalysisService {
     // at 100% resonance" over files whose symbols were never re-read, and the stale definitions sat
     // in the graph until someone happened to run `--force` for unrelated reasons. Pinned by
     // tests/integration/features/scoped-analyze.test.ts, whose second case is exactly that survival.
-    const lastPulse = await this.persistence.query("SELECT timestamp FROM pulses WHERE scoped IS NOT TRUE ORDER BY timestamp DESC LIMIT 1");
-    const lastSyncTime = lastPulse.length > 0 ? Number(lastPulse[0].timestamp) : 0;
     const ignoreManager = (this.orchestrator as any).ignoreManager;
     
     let filteredFiles = files;
@@ -93,6 +97,20 @@ export class AnalysisService {
     }
 
     traceMemory(`after ignore filter (${filteredFiles.length} kept)`);
+    // NOTHING FOUND is checked BEFORE anything is deleted. It used to sit after the reconcile below,
+    // which purges every unit discovery no longer returns — and when discovery returns NOTHING (a
+    // wrong path, or a `.conducksignore` that matches everything) that is every unit in the vault.
+    // Measured: one ignore line took a file's rows from 5 to 0, and the run then reported failure
+    // over an empty vault (state-machine audit P-06-3).
+    if (filteredFiles.length === 0) {
+      logger.warn(`No analyzable source files found under ${targetRoot}. Nothing was analyzed — this is not a clean result. Check the path, or .conducksignore.`);
+      return { success: false, files: 0 };
+    }
+    // Read only now: the first query opens — and so CREATES — the vault, and a run that found nothing
+    // to analyze must not leave one behind for `list`, `setup` and `doctor` to read as an analyzed
+    // project (state-machine audit P-08-6).
+    const lastPulse = await this.persistence.query("SELECT timestamp FROM pulses WHERE scoped IS NOT TRUE ORDER BY timestamp DESC LIMIT 1");
+    const lastSyncTime = lastPulse.length > 0 ? Number(lastPulse[0].timestamp) : 0;
     let dirtyFiles = filteredFiles;
     if (!options.staged && lastSyncTime > 0) {
       const statsPromises = filteredFiles.map(async f => {
@@ -179,10 +197,7 @@ export class AnalysisService {
     // resonance", a success message for a root holding no code at all (ADR 0124: nothing checked
     // must never read as clean). ADR 0021 grades a root that is too BIG; this is the same mistake
     // from the other end.
-    if (filteredFiles.length === 0) {
-      logger.warn(`No analyzable source files found under ${targetRoot}. Nothing was analyzed — this is not a clean result. Check the path, or .conducksignore.`);
-      return { success: false, files: 0 };
-    }
+    // (The empty-discovery gate moved above the reconcile — see "NOTHING FOUND" there.)
 
     if (dirtyFiles.length === 0 && !options.force) {
       logger.warn("No changes detected. Structural Synapse is already at 100% resonance.");

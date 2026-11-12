@@ -114,4 +114,25 @@ describe('WorkerPool dispatches chunks concurrently', () => {
     const killedCount = mockState.liveProcs.filter(p => p.kill.mock.calls.length > 0).length;
     expect(killedCount).toBeGreaterThan(0);
   });
+
+  it('a worker that cannot START rejects instead of hanging (no exit event ever comes)', async () => {
+    // State-machine audit P-06-5. A spawn that fails — `node` not on PATH — emits `error` and then
+    // `close`, and NEVER `exit` (checked against real Node: `spawn('definitely-not-a-binary')`). The
+    // pool listened to `exit` only, so `analyze` waited forever with no message.
+    mockState.handler = (proc) => {
+      setTimeout(() => {
+        const err = Object.assign(new Error('spawn node ENOENT'), { code: 'ENOENT' });
+        proc.emit('error', err);
+        proc.emit('close', -2, null);
+      }, 5);
+    };
+
+    const files = makeFiles(2);
+    const pool = new WorkerPool({} as any);
+    const outcome = await Promise.race([
+      pool.run(files, false, files.map(f => f.path)).then(() => 'resolved', (e: Error) => e.message),
+      new Promise<string>(r => setTimeout(() => r('HUNG'), 2000)),
+    ]);
+    expect(outcome).toMatch(/failed to start: spawn node ENOENT/);
+  });
 });

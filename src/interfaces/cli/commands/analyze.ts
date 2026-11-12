@@ -47,7 +47,13 @@ export class AnalyzeCommand implements ConducksCommand {
       // files here" from "no changes since last time" and returns success:false for the first —
       // and the CLI discarded the result, so a wrong path exited 0 and any script calling this read
       // it as a successful analysis of an empty codebase.
-      if (result && result.success === false) process.exitCode = 1;
+      if (result && result.success === false) {
+        process.exitCode = 1;
+        // Nothing was pulsed, so there is nothing to reclaim — and reclaiming OPENS the vault, which
+        // created one for a run that analyzed nothing. `list`, `setup` and `doctor` then read that
+        // empty file as an analyzed project (state-machine audit P-08-6).
+        return;
+      }
 
       // Reclaim the vault now the pulse has published. A pulse purges and re-inserts every unit it
       // touched, and DuckDB keeps the old row versions forever — so the file grows on every analyze

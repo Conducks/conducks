@@ -140,7 +140,14 @@ export class WorkerPool {
             ));
           };
 
-          proc.on('error', (err) => { spawnError = err; });
+          // A process that never STARTED emits `error` and `close` but no `exit` — so waiting for
+          // `exit` alone hung `analyze` forever when `node` was not on PATH (state-machine audit
+          // P-06-5). No pid means it never started: fail the chunk now. An error on a running
+          // process is still reported by its `exit`, as before.
+          proc.on('error', (err) => {
+            spawnError = err;
+            if (proc.pid === undefined) failChunk(`failed to start: ${err.message}`);
+          });
 
           proc.on('exit', (code, signal) => {
             if (spawnError || signal || (code !== null && code !== 0)) {
