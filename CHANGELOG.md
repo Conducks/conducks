@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Added — Java
+- `prune` reports unused class members with a new finding type, `UNUSED_MEMBER`: a method of a class in use that nothing calls, and a private field nothing reads or writes. A public method of a public class is treated as API and never reported, nor is anything a framework reaches: annotated members, fields of annotated classes (JPA, Lombok), serialization hooks, bean accessors, overrides and constructors.
+- Calls are bound through the receiver's declared type: a local, a field, a parameter or an inherited method (`adapter.fromJson()` reaches `TypeAdapter.fromJson`, not whichever `fromJson` was found first). Measured against javac: spring-petclinic 93.3% → 98.3% of calls bound to the exact method, google/gson 78.9% → 90.4%; wrong targets 12 → 1 and 1,061 → 212.
+- Constructors are extracted, and reads and writes of fields are edges (`impact` on a field works).
+- Accuracy checks against javac for dead code and for call edges, run on a fixture, spring-petclinic and google/gson (`npm run oracle:java-dead*`, `oracle:java-calls*`).
+
+### Fixed — Java and C#
+- Static imports, wildcard imports and nested-class imports resolve, and classes in one package see each other without an import. A class used only through its static members, `X.class`, a method reference, a generic supertype, `new X<>()`, `instanceof`, a cast, a `catch` or an array type is no longer reported dead.
+- `new Owner()` beside a local `owner` bound to the variable, so `impact Owner` found no callers. A call never binds to a variable now.
+- `@Valid Owner owner` recorded a parameter named `@Valid`. `analyze` crashed on a project with a variable named `constructor`.
+- C#: every class with a constructor was stored as a function, because the constructor took the class's id. Fixed for both languages.
+
 ### Fixed — state that changes over time (two audits, 201 findings)
 - `watch`, `watch --pulse` and `mirror --live` no longer die when a README, `package.json` or other file no language reads is saved, or (for `--pulse`) when one changed since the last `analyze`.
 - `watch --pulse` writes the vault the way `analyze` does: a renamed or deleted symbol no longer stays behind as a ghost no later run removes, a deleted file's symbols leave the vault, and nothing is written after a branch switch stops auto-pulse. A watched session no longer leaves `drift`, `audit` and `guard` answering "not assessed", nor makes the next `analyze` drop the real pulses' history.

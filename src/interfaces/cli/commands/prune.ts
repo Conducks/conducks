@@ -10,7 +10,7 @@ import { displayPath } from "@/interfaces/cli/shared/display-path.js";
  */
 export class PruneCommand implements ConducksCommand {
   public id = "prune";
-  public description = "Identify unused exports and dead code";
+  public description = "Identify unused exports, unused class members and dead code";
   public usage = "conducks prune [--type <TYPE>] [--limit <n>] [--json]";
 
   public async execute(args: string[], registry: Registry): Promise<void> {

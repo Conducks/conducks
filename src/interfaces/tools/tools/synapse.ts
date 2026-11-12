@@ -931,7 +931,7 @@ min_members (the set the page was drawn from), and "shown" is how many came back
     layer: "code",
     type: "tool",
     version: "1.0.0",
-    description: `Find dead code: orphaned symbols, unused exports, and stale imports.
+    description: `Find dead code: orphaned symbols, unused exports, unused class members (Java), and stale imports.
 
 WHEN TO USE: Before a refactor to find safe-to-delete code. When cleaning up a module. When reducing bundle size.
 AFTER THIS: Use conducks_impact on a flagged symbol to confirm nothing calls it before deleting.
@@ -940,6 +940,8 @@ Finding types:
 - ORPHAN: defined but never called or imported by anything
 - UNUSED_EXPORT: exported but never consumed outside its own file
 - STALE_IMPORT: imported but never used in the file
+- UNUSED_MEMBER: a method or private field of a type in use that nothing calls, reads or writes (Java)
+- UNIMPORTED_MODULE, ONLY_IMPORTED: QUESTIONS, not verdicts — the graph cannot tell; read before deleting
 
 Returns: list of findings with type, symbol name, file path, and reason.`,
     annotations: {

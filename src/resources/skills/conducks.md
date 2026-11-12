@@ -67,7 +67,7 @@ Most responses carry `indexStaleness`. Stale means re-analyze before trusting th
 | tool | answers |
 |---|---|
 | `conducks_audit` | cycles, god objects, violations. Modes: `scan`, `advice`, `guard` (blocks over a risk threshold), `archeology` (decay over pulses) |
-| `conducks_prune` | dead code — ORPHAN, UNUSED_EXPORT, STALE_IMPORT |
+| `conducks_prune` | dead code — ORPHAN, UNUSED_EXPORT, STALE_IMPORT, UNUSED_MEMBER (Java methods and private fields) |
 | `conducks_coverage` | overlays an istanbul `coverage-final.json` onto function spans. A dark (0%) function with no callers is dead; one that was covered and went dark broke |
 
 **Nothing here writes to your code.** Every tool is a reader; conducks writes only its own vault.
@@ -152,7 +152,7 @@ dependency stack, specific logic goes up toward the entry points. Dependencies p
 
 ```
 1  conducks_audit({ mode: "scan" })     cycles, illegal edges, policy rules
-2  conducks_prune({ type: "all" })      ORPHAN · UNUSED_EXPORT · STALE_IMPORT
+2  conducks_prune({ type: "all" })      ORPHAN · UNUSED_EXPORT · STALE_IMPORT · UNUSED_MEMBER
 3  conducks_explain({ symbol: "X" })    why one symbol is flagged
 ```
 

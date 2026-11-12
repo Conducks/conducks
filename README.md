@@ -160,7 +160,7 @@ The agent will then have access to these 12 tools, every one of them read-only. 
 | `conducks_audit`       | Detect circular deps, god objects, violations (modes: scan, advice, guard, archeology) |
 | `conducks_context`     | Collect structural context around a symbol within a graph radius                              |
 | `conducks_flows`       | List execution flows — each a named entry point and the symbols it calls                      |
-| `conducks_prune`       | Find dead code: orphaned symbols, unused exports, stale imports                                |
+| `conducks_prune`       | Find dead code: orphaned symbols, unused exports, unused class members (Java), stale imports   |
 | `conducks_coverage`    | Overlay an istanbul/c8 `coverage-final.json` onto the graph — per-function fill %              |
 | `conducks_diff`        | Structural diff of uncommitted changes                                                         |
 | `conducks_graph_query` | Run a raw SELECT against the DuckDB graph store                                                |
@@ -217,7 +217,7 @@ conducks advise                   # Architectural recommendations
 conducks diff [--base <id>] [--head <id>]
                                   # Structural risk of the current changes
 conducks drift [prevPulseId]      # Architectural drift between two pulses
-conducks prune                    # Unused exports and dead code
+conducks prune                    # Unused exports, unused class members and dead code
 conducks supply-chain [--deps-only]
                                   # Dependency / boundary surface (stdlib vs versioned deps)
 ```
@@ -255,9 +255,9 @@ Every language below is parsed with a native Tree-sitter grammar and a per-langu
 | Go                      | Full          | functions, structs, interfaces, methods, generics, type-usage edges; module-path imports from go.mod, a package is its directory, functions used as values, `init`, methods reached through interfaces (staticcheck U1000's rule) |
 | Rust                    | Partial       | functions, structs, traits, enums, impl methods, type-usage edges, calls and imports across a Cargo workspace (crate names, `crate::`/`self::`/`super::`), method calls, struct literals, enum paths and functions passed as values; `#[test]`, `tests.rs` and `*_tests.rs` are tests; trait-impl methods are never dead — no per-binding imports; a method on a local value or a chain binds by name, not by type, so some live methods are still reported dead |
 | C / C++                 | Partial       | structs/classes, functions, methods — no per-binding imports, no type-usage edges   |
-| C#                      | Partial       | namespaces, classes, methods — properties are not extracted                         |
+| C#                      | Partial       | namespaces, classes, methods, constructors — properties are not extracted           |
 | Ruby                    | Partial       | classes and methods                                                                 |
-| Java                    | Partial       | classes, records, interfaces, enums, methods, constructors, imports (class, static, wildcard, nested), a package is one module, **EXTENDS/IMPLEMENTS heritage** incl. generic supertypes, type-usage edges (declarations, generics, `X.class`, static qualifiers, method references, `instanceof`, casts, `catch`, arrays), annotations; calls bound through the receiver's declared type (locals, fields, parameters, inherited members); dead code scored against javac (`npm run oracle:java-dead*`), including unused methods of a type in use (a public method of a public type is API and never judged) and unused private fields; call edges scored against javac (`npm run oracle:java-calls*`: petclinic 98.3% exact, gson 90.4%, precision 99.7% / 97.3%) |
+| Java                    | Full          | classes, records, interfaces, enums, methods, constructors, fields, annotations; imports (class, static, wildcard, nested) and same-package use; **EXTENDS/IMPLEMENTS heritage** incl. generic supertypes; type-usage edges; calls bound through the receiver's declared type. Checked against javac on spring-petclinic and google/gson: 98.3% / 90.4% of calls bound to the exact method, 99.7% / 97.3% of drawn call edges correct, and no dead-code verdict javac contradicts (incl. unused methods and private fields) |
 | PHP                     | Partial       | namespaces, classes, traits, interfaces, enums, methods, functions, typed properties, use-imports incl. aliases; no heritage edges, no constants or enum cases |
 | Swift                   | Partial       | classes, actors, structs, enums, extensions, protocols, funcs/init/deinit, properties, enum cases, typealiases, **conformance + superclass heritage**; a module is its SPM target, functions used as values, members reached through a protocol; no subscripts, no property wrappers, no async/visibility DNA |
 
