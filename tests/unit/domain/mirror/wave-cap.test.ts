@@ -16,6 +16,9 @@ describe('the visual wave cap can be overridden', () => {
         spy(limit);
         return { nodes: [], links: [], clusters: [], truncated: false, totalNodes: 0 };
       },
+      // The wave is a vault turn like every other gateway read, and a turn closes the handle after
+      // itself (state-machine audit P-10-14).
+      close: async () => {},
     };
     return new GatewayService({} as any, persistence, '/tmp/none');
   };
