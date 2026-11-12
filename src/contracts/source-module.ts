@@ -22,5 +22,13 @@ export function moduleKeyOf(filePath: string | null | undefined): string | null 
     const target = /^(.*\/(?:sources|tests)\/[^/]+)\//.exec(file);
     return `swift:${target ? target[1] : file.slice(0, file.lastIndexOf('/'))}`;
   }
+  if (file.endsWith('.java')) {
+    // A Java PACKAGE is the module: its classes see each other with no import. Keyed on the project
+    // and the package path below the source root, so `src/main/java/com/acme` and `src/test/java/com/
+    // acme` are one package (Maven's convention), and the same package name in another project is not.
+    const dir = file.slice(0, file.lastIndexOf('/'));
+    const root = /^(.*?\/)src\/[^/]+\/java\/(.*)$/.exec(dir + '/');
+    return root ? `java:${root[1]}|${root[2].replace(/\/$/, '')}` : `java:${dir}`;
+  }
   return null;
 }
