@@ -1888,6 +1888,10 @@ export class SynapsePersistence {
 
   /** Releases the connection and the lock. A held lock is what makes every other reader wait. */
   public async close(): Promise<void> {
+    // An open still IN FLIGHT is waited out and then closed. `db` and `instance` are both null until
+    // it finishes, so a close arriving in that window did nothing and the open then kept the file
+    // locked against every other process (state-machine audit round 2, Q-01-5).
+    if (this.opening) await this.opening.catch(() => { /* its caller reports it */ });
     // The snapshot exists so that readers survive THIS write session. Once the session is over the
     // vault is unlocked again and readers go straight to it, so keeping the copy would make ADR
     // 0040's "2x on disk for the duration of a pulse" into 2x on disk forever. Unlinking it does

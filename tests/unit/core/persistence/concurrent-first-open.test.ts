@@ -45,4 +45,21 @@ describe('a closed vault reopened by two callers at once', () => {
     expect(results.map(r => r.status)).toEqual(['fulfilled', 'fulfilled', 'fulfilled']);
     expect(writableElsewhere(root)).toBe(true);
   }, 60000);
+
+  // Round 2, Q-01-5: `close()` checked `db` and `instance`, both still null while an open was in
+  // flight, and returned. The open then finished and kept the file locked until some later close.
+  it('a close that arrives while an open is in flight still releases the file', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'conducks-close-during-open-'));
+    roots.push(root);
+    const seed = new SynapsePersistence(root, false);
+    await seed.query('SELECT 1');
+    await seed.close();
+
+    const p = new SynapsePersistence(root, false);
+    const opening = p.query('SELECT 1 AS x');
+    await p.close();
+    await opening.catch(() => { /* a query racing its own close may fail; the lock is the point */ });
+
+    expect(writableElsewhere(root)).toBe(true);
+  }, 60000);
 });
