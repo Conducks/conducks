@@ -124,13 +124,20 @@ export class CoverageViewCommand implements ConducksCommand {
       // running app instrumented), but the same feedback loop for a test-driven session.
       console.log(chalk.cyan(`\n  👁  Watching ${covPath} — re-renders on change. Ctrl-C to stop.`));
       let timer: NodeJS.Timeout | null = null;
-      watch(covPath, () => {
+      const watcher = watch(covPath, () => {
         if (timer) clearTimeout(timer);
         timer = setTimeout(() => { regenerate(); }, 150); // debounce mid-write bursts
       });
-      // Keep the process alive until interrupted.
+      // Keep the process alive until interrupted — and then let it END. The watcher and the pending
+      // timer are what hold the event loop open, and neither was released: Ctrl-C printed "Stopped
+      // watching." and the process stayed alive (state-machine audit P-09-4).
       await new Promise<void>((resolve) => {
-        process.on("SIGINT", () => { console.log(chalk.dim("\n  Stopped watching.")); resolve(); });
+        process.once("SIGINT", () => {
+          watcher.close();
+          if (timer) clearTimeout(timer);
+          console.log(chalk.dim("\n  Stopped watching."));
+          resolve();
+        });
       });
     } finally {
       await closePersistence(registry);

@@ -160,6 +160,48 @@ describe('coverage commands refuse a file that is not a coverage report', () => 
   }, 120000);
 
   /**
+   * State-machine audit P-09-4 / P-09-5. `coverage-view --watch` never closed its `fs.watch`, so
+   * Ctrl-C printed "Stopped watching." and the process stayed alive. And the watch was bound to the
+   * report's INODE: a writer that saves by write-then-rename produced one re-render and then
+   * silence for the rest of the session.
+   */
+  it('coverage-view --watch follows a report replaced by rename, and Ctrl-C ends it', async () => {
+    const { spawn } = await import('node:child_process');
+    const cli = path.resolve('build/src/interfaces/cli/index.js');
+    const live = path.join(repo, 'live-coverage.json');
+    fs.copyFileSync(covPath, live);
+    const proc = spawn('node', [cli, 'coverage-view', live, '--watch', '--out', path.join(repo, 'live.html')], { cwd: repo });
+    let out = '';
+    proc.stdout.on('data', d => { out += String(d); });
+    proc.stderr.on('data', d => { out += String(d); });
+    const exited = new Promise<number | null>(r => proc.on('exit', code => r(code)));
+    const until = async (test: () => boolean, ms = 30000) => {
+      const end = Date.now() + ms;
+      while (Date.now() < end) { if (test()) return true; await new Promise(r => setTimeout(r, 100)); }
+      return false;
+    };
+    const renders = () => (out.match(/re-rendered/g) ?? []).length;
+    const replace = () => {
+      const tmp = `${live}.tmp`;
+      fs.copyFileSync(covPath, tmp);
+      fs.renameSync(tmp, live);
+    };
+    try {
+      expect(await until(() => /Watching/.test(out))).toBe(true);
+      replace();
+      expect(await until(() => renders() >= 1)).toBe(true);
+      await new Promise(r => setTimeout(r, 400));
+      replace();
+      expect(await until(() => renders() >= 2)).toBe(true);
+      proc.kill('SIGINT');
+      const code = await Promise.race([exited, new Promise<string>(r => setTimeout(() => r('STILL RUNNING'), 8000))]);
+      expect(code).not.toBe('STILL RUNNING');
+    } finally {
+      proc.kill('SIGKILL');
+    }
+  }, 120000);
+
+  /**
    * The `not.toMatch(/Missing coverage file/)` is the point, and it was missing the first time.
    * This asserted only a non-zero exit — which it got, from the WRONG message: the `--out` skip
    * index was `outIdx + 1` with no guard for `indexOf` returning -1, so with no `--out` present the
