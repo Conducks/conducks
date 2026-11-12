@@ -31,6 +31,10 @@ describe('a deferred graph refuses to answer instead of answering nothing', () =
     expect(() => g.getNodesMap()).toThrow(/not materialised/);
     expect(() => g.getAllEdges()).toThrow(/not materialised/);
     expect(() => g.getNeighbors('x')).toThrow(/not materialised/);
+    // The two lookups by NAME and by LINE answered [] / undefined on a deferred graph — symbol
+    // resolution and the advisor read "not found" instead of failing (state-machine audit P-02-6).
+    expect(() => g.findNodesByName('x')).toThrow(/not materialised/);
+    expect(() => g.findSymbolAtLine('/a.ts', 1)).toThrow(/not materialised/);
   });
 
   /**

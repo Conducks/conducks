@@ -945,6 +945,9 @@ export class ConducksAdjacencyList {
   }
 
   public findNodesByName(name: string): ConducksNode[] {
+    // Guarded like `getAllNodes`: on a deferred graph this answered [] and a symbol read as "not
+    // found" instead of failing loudly (state-machine audit P-02-6).
+    this.assertMaterialised("findNodesByName");
     const query = name.toLowerCase();
     const results = new Map<NodeId, ConducksNode>();
 
@@ -1019,6 +1022,7 @@ export class ConducksAdjacencyList {
    * and reuses that single canonical value everywhere inside.
    */
   public findSymbolAtLine(filePath: string, line: number): ConducksNode | undefined {
+    this.assertMaterialised("findSymbolAtLine");   // P-02-6, as `findNodesByName`
     if (!filePath || typeof filePath !== 'string') return undefined;
     // FIX 4: Normalise once — all comparisons below use this canonical value.
     const targetPath = filePath.toLowerCase();
