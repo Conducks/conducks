@@ -7,6 +7,7 @@ import cors from "cors";
 import path from "node:path";
 import { ToolRegistry, Tool } from "@/registry/tool-registry.js";
 import { ConducksRegistry } from "./hypertoon.js";
+import { enterToolCall, leaveToolCall, ensureAnchor, releaseAnchor } from "./shared/anchor.js";
 import { synapseTools } from "./tools/synapse.js";
 import { kineticTools } from "./tools/kinetic.js";
 import { registry } from "@/registry/index.js";
@@ -127,7 +128,15 @@ export class ConducksMCPServer {
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const { uri } = request.params;
       
+      // Through the same gate and anchor as a tool call. This relied on "CLI-level initialization",
+      // which an MCP server never has: on a fresh server the graph is deferred, and every resource —
+      // even ones that need no graph — failed with "read a graph that is not materialised"
+      // (state-machine audit P-10-4).
+      let entered = false;
       try {
+        await enterToolCall();
+        entered = true;
+        await ensureAnchor();
         // Conducks Lazy Resonance: Relies on CLI-level initialization for the session
         const status = registry.audit.status();
         const nodes = Array.from(registry.query.graph.getGraph().getAllNodes());
@@ -232,6 +241,8 @@ export class ConducksMCPServer {
         throw new Error(`Resource not found: ${uri}`);
       } catch (err: any) {
         throw new Error(`Failed to read resource ${uri}: ${err.message}`);
+      } finally {
+        if (entered) { leaveToolCall(); await releaseAnchor(); }
       }
     });
   }

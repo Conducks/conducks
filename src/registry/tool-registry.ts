@@ -175,10 +175,11 @@ export class ToolRegistry extends ConducksRegistry<Tool> {
     // only one that was not counted (todo52#P2).
     registry.infrastructure.acquireVault();
     try {
-      // Conducks Lazy Resonance: Initialize only for the duration of the request
-      const rootPath = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
-      await registry.initialize(true, rootPath);
-      
+      // No re-anchor here. This anchored every call to the LAUNCH root, and the handler's wrapper
+      // then re-anchored to the call's `path` — two swaps and a full graph reload for every call
+      // naming another project (state-machine audit P-10-5). Anchoring belongs to the one place that
+      // knows the requested project and can do it without closing the vault under other calls
+      // (`enterToolCall`, interfaces/tools/shared/anchor.ts); every MCP tool passes through it.
       const result = await tool.handler(args);
       const response: ToolResponse = {
         content: [{ type: "text", text: tool.formatter(result) }],

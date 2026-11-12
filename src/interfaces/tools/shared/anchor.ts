@@ -43,6 +43,74 @@ function validatePath(customPath: string, projectRoot: string): string {
 }
 
 /**
+ * The root a tool call is answered from: its `path` once the guard above has accepted it, otherwise
+ * the server's launch root. Throws for a refused path — and every caller asks this BEFORE anchoring,
+ * so a refused path never becomes the anchor other calls then see (state-machine audit P-10-10).
+ */
+export function resolveRequestRoot(customPath?: string): string {
+  const projectRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
+  return customPath ? validatePath(customPath, projectRoot) : projectRoot;
+}
+
+/**
+ * THE ANCHOR GATE — what lets tool calls overlap without one taking the vault away from another.
+ *
+ * Everything under a handler is a module-level singleton: one registry, one graph, one vault handle.
+ * Calls for the anchored project run concurrently, as before (todo52). A call for ANOTHER project
+ * used to re-anchor on the spot, which closes the handle and clears the graph under every call still
+ * running; measured, a SQL query naming project B answered from project A's vault, every time,
+ * when calls for both were pipelined (state-machine audit P-10-1).
+ *
+ * The smallest design that makes that safe: a re-anchor is EXCLUSIVE. It waits until no call is
+ * running, runs alone, and calls that arrive while one is waiting queue behind it so it cannot be
+ * starved. The graph-staleness check (P-10-3) is exclusive for the same reason — a reload clears the
+ * graph — and runs only when the gate is idle, so steady concurrent traffic pays nothing for it.
+ */
+let activeCalls = 0;
+let exclusive: Promise<void> | null = null;
+let waiting: Array<() => void> = [];
+
+function wakeWaiters(): void {
+  const ready = waiting;
+  waiting = [];
+  for (const wake of ready) wake();
+}
+
+/** Enter the gate for one tool call. Throws (having changed nothing) when `customPath` is refused. */
+export async function enterToolCall(customPath?: string): Promise<void> {
+  const root = resolveRequestRoot(customPath);
+  for (;;) {
+    if (exclusive) { await exclusive.catch(() => { /* the owner reports it */ }); continue; }
+    const reanchor = registry.infrastructure.wouldReanchor(true, root);
+    if (activeCalls === 0) {
+      activeCalls++;
+      exclusive = (async () => {
+        if (reanchor) await registry.initialize(true, root);
+        else if (await registry.infrastructure.graphIsStale()) registry.infrastructure.reloadGraph();
+      })();
+      try {
+        await exclusive;
+      } catch (err) {
+        activeCalls--;
+        throw err;
+      } finally {
+        exclusive = null;
+        if (activeCalls === 0) wakeWaiters();
+      }
+      return;
+    }
+    if (!reanchor && waiting.length === 0) { activeCalls++; return; }
+    await new Promise<void>(resolve => waiting.push(resolve));
+  }
+}
+
+/** Leave the gate; the last call out lets a queued re-anchor run. */
+export function leaveToolCall(): void {
+  activeCalls = Math.max(0, activeCalls - 1);
+  if (activeCalls === 0) wakeWaiters();
+}
+
+/**
  * [Conducks Anchor Check] 🏺
  * Ensures the structural registry is aligned to the correct workspace root
  * before executing any tool. This prevents "Detached Root" errors when
@@ -53,8 +121,14 @@ export async function ensureAnchor(
   readOnly: boolean = true,
   needsGraph: boolean = true,
 ): Promise<void> {
-  const projectRoot = process.env.CONDUCKS_WORKSPACE_ROOT || process.cwd();
-  const root = customPath ? validatePath(customPath, projectRoot) : projectRoot;
+  // The hold is taken FIRST, before anything below can throw. Every handler releases in its
+  // `finally` whether or not this returned, so a hold taken at the END was released without ever
+  // being taken whenever the path guard or the sibling diagnostic refused the call: the count drifted
+  // down by one per refusal and reached zero — closing the vault — while other calls were still
+  // reading it (state-machine audit P-10-2).
+  registry.infrastructure.acquireVault();
+
+  const root = resolveRequestRoot(customPath);
 
   // An MCP server is often launched at a directory that HOLDS projects rather than being one — a
   // workspace root with several repos beneath it. Every call then failed with DuckDB's raw
@@ -91,8 +165,6 @@ export async function ensureAnchor(
   if (rootChanged || modeChanged) {
     await registry.initialize(readOnly, root);
   }
-
-  registry.infrastructure.acquireVault();
 
   // Opt-OUT, deliberately. Forgetting to materialise a graph a tool walks is SILENT: the domain
   // services hold their own reference from construction, so they see an empty graph and report zero
