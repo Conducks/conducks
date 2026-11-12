@@ -321,7 +321,8 @@ export class AnalyzeOrchestrator {
         sizeBytes: Buffer.byteLength(file.source),
       })));
 
-      await this.persistence.run("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)", ['head', pulseId]);
+      // (A `head` metadata row holding the pulse id was written here and read nowhere; the name read
+      // as a commit hash, which `lastAnalyzedCommit` is. Removed — state-machine audit P-06-14.)
 
       // Conducks Pulse Hardening: Ensure pulse record knows total count.
       //

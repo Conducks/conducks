@@ -41,8 +41,9 @@ export class AnalysisService {
   public setPersistence(persistence: SynapsePersistence) {
     this.persistence = persistence;
     this.query.setPersistence(persistence);
-    (this.orchestrator as any).persistence = persistence;
-    (this.graph as any).persistence = persistence;
+    // The orchestrator's own setter, not a cast. The graph got the same assignment and has no such
+    // field — nothing read it, so it looked like a re-anchor that did not exist (P-06-10).
+    this.orchestrator.setPersistence(persistence);
   }
 
   /**
