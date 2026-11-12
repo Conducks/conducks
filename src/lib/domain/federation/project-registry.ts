@@ -117,6 +117,10 @@ export function sameGitActivity(a: GitActivity | null, b: GitActivity | null): b
   return a.head === b.head && a.index === b.index;
 }
 
+/** How long `register`/`forget` wait for another process's lock, and when a lock counts as abandoned. */
+const LOCK_WAIT_MS = 5_000;
+const LOCK_STALE_MS = 10_000;
+
 export class ProjectRegistry {
   private readonly filePath: string;
 
@@ -151,6 +155,10 @@ export class ProjectRegistry {
    * success when nothing reached the disk (state-machine audit P-05-8).
    */
   public register(root: string, name?: string): { added: boolean; total: number; written: boolean } {
+    return this.locked(() => this.registerUnlocked(root, name));
+  }
+
+  private registerUnlocked(root: string, name?: string): { added: boolean; total: number; written: boolean } {
     const absolute = path.resolve(root);
     const projects = this.list();
     const now = Date.now();
@@ -175,6 +183,10 @@ export class ProjectRegistry {
    * monitor deliberately REPORTS a missing root rather than forgetting it (see `missingRoots`).
    */
   public forget(root: string): boolean {
+    return this.locked(() => this.forgetUnlocked(root));
+  }
+
+  private forgetUnlocked(root: string): boolean {
     const absolute = path.resolve(root);
     const projects = this.list();
     const remaining = projects.filter(p => path.resolve(p.root) !== absolute);
@@ -198,13 +210,46 @@ export class ProjectRegistry {
       fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
       this.backUpIfMalformed();
       const payload: RegistryFile = { version: 1, projects };
-      fs.writeFileSync(this.filePath, JSON.stringify(payload, null, 2) + "\n");
+      // Written beside and renamed over, so a concurrent reader never sees half a file.
+      const tmp = `${this.filePath}.${process.pid}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify(payload, null, 2) + "\n");
+      fs.renameSync(tmp, this.filePath);
       return true;
     } catch {
       // A registry that cannot be written costs cross-project monitoring, nothing else. `setup` must
       // not fail because a home directory is read-only.
       return false;
     }
+  }
+
+  /**
+   * Runs one read-modify-write of the registry while holding `projects.json.lock`.
+   *
+   * Two `setup` runs at the same moment — two agents in two projects — each read the list, appended
+   * their own root and wrote it back, so one project silently vanished (state-machine audit P-05-7;
+   * measured: three processes registering 60 roots each kept 28 of 180). The lock is a file created
+   * with `wx`, which only one process can win. A lock older than LOCK_STALE_MS belonged to a process
+   * that died holding it and is taken over. When no lock can be had at all — an unwritable home, or a
+   * wait past LOCK_WAIT_MS — the write goes ahead unlocked: registration is never worth failing
+   * `setup` over, and an unwritable file still reports `written: false`.
+   */
+  private locked<T>(fn: () => T): T {
+    const lock = `${this.filePath}.lock`;
+    let held = false;
+    try {
+      fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
+      const deadline = Date.now() + LOCK_WAIT_MS;
+      while (!held) {
+        try { fs.closeSync(fs.openSync(lock, "wx")); held = true; }
+        catch (err) {
+          if ((err as NodeJS.ErrnoException).code !== "EEXIST") break;
+          try { if (Date.now() - fs.statSync(lock).mtimeMs > LOCK_STALE_MS) { fs.rmSync(lock, { force: true }); continue; } } catch { continue; }
+          if (Date.now() > deadline) break;
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+        }
+      }
+    } catch { /* no lock to be had: write unlocked */ }
+    try { return fn(); } finally { if (held) { try { fs.rmSync(lock, { force: true }); } catch { /* next taker clears a stale one */ } } }
   }
 
   /**
